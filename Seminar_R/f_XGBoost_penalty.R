@@ -22,12 +22,21 @@ Xgboost_imbalance_penalty <- function(X_train, Y_train, Z_train, X_test,
     # Compute probabilities using the logistic function.
     p <- 1 / (1 + exp(-preds))
 
-    # Use the Euclidean distance to get delta
-    delta <- (z - global_z)^2
-    
-    # Compute gradient and hessian for logistic loss.
-    grad <- (p - y) + lambda_pen * delta * p * (1 - p)
-    hess <- p * (1 - p) + lambda_pen * delta * p * (1 - p) * (1 - 2 * p)
+     # Improved delta: difference between average predictions for the two groups.
+    zf <- factor(z)
+    if (nlevels(zf) == 2) {
+      grp_means <- tapply(p, zf, mean)
+      delta     <- abs(diff(unname(grp_means)))
+    } else {
+      delta <- 0  # fallback if not exactly two groups
+    }
+
+    # Compute gradient and Hessian with exponential penalty form.
+    grad <- (p - y) + lambda_pen * delta * (1 - 2*y) * exp((1 - 2*y) * preds)
+    hess <- p * (1 - p) + lambda_pen * delta * exp((1 - 2*y) * preds)
+
+    return(list(grad = grad, hess = hess))
+  }
     
     return(list(grad = grad, hess = hess))
   }
